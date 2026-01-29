@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Zoo Feeder - ป้อนอาหารสัตว์</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: #111;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            /* ลายพื้นหลังแบบจุด */
+            background-image: radial-gradient(#333 2px, transparent 2px);
+            background-size: 30px 30px;
+        }
+
+        #game-container {
+            position: relative;
+            height: 100%;
+            max-height: 950px;
+            width: 100%;
+            max-width: 500px;
+            background: #5ba350; /* สีหญ้าที่สดใสขึ้น */
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            border: 4px solid #333;
+            border-radius: 20px;
+        }
+
+        /* --- Game Elements --- */
+        
+        #belt-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .belt {
+            position: absolute;
+            top: 0;
+            height: calc(100% - 200px);
+            background: #555;
+            border-left: 6px solid #333;
+            border-right: 6px solid #333;
+            transition: left 0.5s ease-in-out, width 0.5s ease-in-out;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.6);
+        }
+
+        .belt-marking {
+            position: absolute;
+            width: 100%;
+            height: 30px;
+            background: rgba(0,0,0,0.2);
+            animation: moveBelt 4s linear infinite;
+        }
+
+        @keyframes moveBelt {
+            0% { top: -60px; }
+            100% { top: 100%; }
+        }
+
+        /* Animal Zone */
+        #animal-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 280px; /* เพิ่มความสูงพื้นที่ */
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 20%, transparent);
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        .animal-slot {
+            position: absolute;
+            bottom: 10px;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            transition: left 0.5s ease-in-out;
+            width: 140px; /* พื้นที่กว้างขึ้น */
+        }
+
+        .animal-emoji {
+            font-size: 10rem; /* ขยายขนาดสัตว์ให้ใหญ่สะใจ */
+            line-height: 1;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.7));
+            transition: transform 0.2s;
+            z-index: 20;
+            cursor: pointer;
+        }
+        
+        .animal-diet-bubble {
+            background: white;
+            color: #333;
+            padding: 8px 18px;
+            border-radius: 30px;
+            font-size: 1.4rem;
+            font-weight: 900;
+            margin-bottom: -20px; /* ซ้อนกับหัวสัตว์ */
+            z-index: 25;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 3px solid #eee;
+            transform: scale(0.9);
+        }
+
+        .animal-happy .animal-emoji { animation: bounce 0.6s infinite alternate; }
+        .animal-angry .animal-emoji { animation: shake 0.5s; }
+
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-25px); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-15px); } 75% { transform: translateX(15px); } }
+
+        .food-item {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            transform: translateX(-50%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 5rem;
+            z-index: 30;
+            cursor: pointer;
+            user-select: none;
+            filter: drop-shadow(0 8px 10px rgba(0,0,0,0.4));
+            touch-action: manipulation;
+            pointer-events: auto; 
+            transition: transform 0.1s, opacity 0.3s;
+        }
+        .food-item:active { transform: translateX(-50%) scale(0.85); }
+
+        /* --- HUD --- */
+        .hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .stat-box {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 1.2rem;
+            border: 2px solid rgba(255,255,255,0.2);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            margin-bottom: 8px;
+        }
+
+        .pause-btn {
+            background: white;
+            color: #333;
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            pointer-events: auto;
+            box-shadow: 0 6px 0 #ccc;
+            transition: all 0.1s;
+            border: 2px solid #ccc;
+        }
+        .pause-btn:active { transform: translateY(6px); box-shadow: none; }
+
+        /* --- Modern Overlay --- */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+            text-align: center;
+            padding: 30px;
+        }
+
+        /* --- Level Cards (Mobile Game Style) --- */
+        .level-card {
+            position: relative;
+            background: white;
+            border-radius: 24px;
+            padding: 15px 20px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 8px 0 rgba(0,0,0,0.2); /* 3D Shadow */
+            margin-bottom: 15px;
+            border: 4px solid transparent;
+            overflow: hidden;
+        }
+        .level-card:active {
+            transform: translateY(8px);
+            box-shadow: none;
+            margin-bottom: 23px; /* Compensate for shadow removal */
+        }
+
+        .level-card.easy { border-color: #4ade80; background: linear-gradient(to right, #f0fdf4, #dcfce7); }
+        .level-card.medium { border-color: #facc15; background: linear-gradient(to right, #fefce8, #fef9c3); }
+        .level-card.hard { border-color: #f87171; background: linear-gradient(to right, #fef2f2, #fee2e2); }
+
+        .level-icon-box {
+            width: 70px;
+            height: 70px;
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .level-card.easy .level-icon-box { background: #4ade80; color: #fff; }
+        .level-card.medium .level-icon-box { background: #facc15; color: #fff; }
+        .level-card.hard .level-icon-box { background: #f87171; color: #fff; }
+
+        .level-info { text-align: left; flex: 1; }
+        .level-title { font-size: 1.8rem; font-weight: 900; line-height: 1; margin-bottom: 4px; }
+        .level-desc { font-size: 1rem; font-weight: 500; opacity: 0.8; }
+        
+        .easy .level-title { color: #166534; } .easy .level-desc { color: #15803d; }
+        .medium .level-title { color: #854d0e; } .medium .level-desc { color: #a16207; }
+        .hard .level-title { color: #991b1b; } .hard .level-desc { color: #b91c1c; }
+
+        /* General Buttons */
+        .btn-game {
+            background: #3b82f6;
+            color: white;
+            padding: 16px 0;
+            width: 100%;
+            border-radius: 20px;
+            font-size: 1.5rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            box-shadow: 0 8px 0 #1d4ed8;
+            transition: all 0.1s;
+            border: 2px solid #60a5fa;
+            text-shadow: 0 2px 0 rgba(0,0,0,0.2);
+        }
+        .btn-game:active { transform: translateY(8px); box-shadow: none; }
+        
+        .btn-yellow { background: #eab308; box-shadow: 0 8px 0 #a16207; border-color: #fde047; }
+        .btn-yellow:active { box-shadow: none; }
+
+        .btn-green { background: #22c55e; box-shadow: 0 8px 0 #15803d; border-color: #86efac; }
+        .btn-green:active { box-shadow: none; }
+
+        .btn-secondary {
+            background: #4b5563;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 15px;
+            font-weight: bold;
+            box-shadow: 0 5px 0 #1f2937;
+            font-size: 1.1rem;
+        }
+        .btn-secondary:active { transform: translateY(5px); box-shadow: none; }
+
+        /* Animations */
+        .feedback-text {
+            position: absolute;
+            font-weight: 900;
+            font-size: 3rem; 
+            pointer-events: none;
+            z-index: 60;
+            animation: floatUp 0.8s forwards;
+            text-shadow: 3px 3px 0 #000;
+            white-space: nowrap;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) translateX(-50%) scale(0.8); opacity: 0; }
+            20% { transform: translateY(-20px) translateX(-50%) scale(1.2); opacity: 1; }
+            100% { transform: translateY(-80px) translateX(-50%) scale(1); opacity: 0; }
+        }
+        
+        .levelup-text {
+            position: absolute;
+            top: 25%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-weight: 900;
+            font-size: 5rem;
+            color: #fbbf24;
+            pointer-events: none;
+            z-index: 70;
+            animation: zoomFade 1.5s forwards;
+            text-shadow: 0 0 30px rgba(0,0,0,0.9), 4px 4px 0 #000;
+            white-space: nowrap;
+        }
+        @keyframes zoomFade {
+            0% { transform: translateX(-50%) scale(0.5); opacity: 0; }
+            20% { transform: translateX(-50%) scale(1.2); opacity: 1; }
+            80% { transform: translateX(-50%) scale(1.0); opacity: 1; }
+            100% { transform: translateX(-50%) scale(1.5); opacity: 0; }
+        }
+
+        .switch-alert {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            color: #333;
+            padding: 20px 30px;
+            border-radius: 25px;
+            font-size: 2.2rem;
+            font-weight: 900;
+            z-index: 80;
+            text-align: center;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            width: 90%;
+            border: 6px solid #fbbf24;
+        }
+        @keyframes popIn {
+            from { transform: translate(-50%, -50%) scale(0); }
+            to { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* Leaderboard */
+        .leaderboard-container {
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            padding: 5px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            color: #333;
+        }
+        .lb-tabs {
+            display: flex;
+            background: #f3f4f6;
+            border-radius: 15px;
+            padding: 5px;
+            margin: 10px;
+        }
+        .lb-tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px 0;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #6b7280;
+            transition: all 0.2s;
+        }
+        .lb-tab.active {
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .leaderboard-table {
+            width: 100%;
+            font-size: 1.1rem;
+        }
+        .leaderboard-table th {
+            text-align: left;
+            padding: 12px 15px;
+            color: #9ca3af;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            border-bottom: 2px solid #f3f4f6;
+        }
+        .leaderboard-table td { padding: 12px 15px; border-bottom: 1px solid #f3f4f6; }
+        .rank-1 { color: #eab308; font-weight: 900; font-size: 1.2rem; }
+        .rank-2 { color: #94a3b8; font-weight: 900; }
+        .rank-3 { color: #b45309; font-weight: 900; }
+
+        #name-input {
+            background: #f3f4f6;
+            border: 3px solid #e5e7eb;
+            padding: 15px;
+            border-radius: 16px;
+            color: #333;
+            font-size: 1.5rem;
+            text-align: center;
+            margin-bottom: 15px;
+            outline: none;
+            width: 100%;
+            font-weight: bold;
+        }
+        #name-input:focus { border-color: #3b82f6; background: white; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- HUD -->
+        <div class="hud">
+            <div class="stat-group">
+                <div class="stat-box text-yellow-300 border-yellow-500/50">
+                    <span class="text-2xl">⭐</span> <span id="score" class="text-2xl">0</span>
+                </div>
+                <div class="stat-box text-blue-300 border-blue-500/50">
+                    <span>⚡</span> Lv.<span id="level">1</span>
+                </div>
+            </div>
+            
+            <div class="stat-group items-end">
+                <button class="pause-btn" onclick="togglePause()">II</button>
+                <div class="stat-box text-red-400 border-red-500/50">
+                    <span id="lives">❤️❤️❤️</span>
+                </div>
+                <div class="stat-box text-gray-300 border-gray-500/50 text-sm">
+                    ⏱️ <span id="timer">00:00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Belts -->
+        <div id="belt-container"></div>
+
+        <!-- Animals -->
+        <div id="animal-container"></div>
+
+        <div id="food-layer"></div>
+
+        <!-- Start Overlay -->
+        <div id="start-overlay" class="overlay">
+            <div class="mb-8 animate-bounce transform hover:scale-110 transition-transform">
+                <h1 class="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-xl" style="filter: drop-shadow(0 6px 0 #b45309);">
+                    ZOO<br>FEEDER
+                </h1>
+            </div>
+            
+            <div class="w-full max-w-sm mb-8 px-4 flex flex-col gap-4">
+                <!-- Easy Card -->
+                <div class="level-card easy" onclick="startGame('easy')">
+                    <div class="level-icon-box">🐢</div>
+                    <div class="level-info">
+                        <div class="level-title">โหมดง่าย</div>
+                        <div class="level-desc">1 สายพาน • เริ่มต้นสบายๆ</div>
+                    </div>
+                </div>
+
+                <!-- Medium Card -->
+                <div class="level-card medium" onclick="startGame('medium')">
+                    <div class="level-icon-box">🐆</div>
+                    <div class="level-info">
+                        <div class="level-title">โหมดทั่วไป</div>
+                        <div class="level-desc">2 สายพาน • ท้าทายยิ่งขึ้น</div>
+                    </div>
+                </div>
+
+                <!-- Hard Card -->
+                <div class="level-card hard" onclick="startGame('hard')">
+                    <div class="level-icon-box">🦅</div>
+                    <div class="level-info">
+                        <div class="level-title">โหมดโปร</div>
+                        <div class="level-desc">3 สายพาน • ความเร็วสูง!</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white/10 p-4 rounded-xl border border-white/20 mb-6 max-w-sm w-full mx-4 text-left text-sm backdrop-blur-sm">
+                <div class="mb-1 text-gray-300">• แตะอาหารที่ไม่ใช่ 🥕 ทิ้ง <span class="text-green-300">(+10)</span></div>
+                <div class="mb-1 text-gray-300">• ปล่อยอาหารที่ถูก 🥩 ให้กิน <span class="text-green-300">(+20)</span></div>
+                <div class="text-yellow-300">• เปลี่ยนสัตว์ทุก 500 คะแนน!</div>
+            </div>
+
+            <div class="w-full max-w-sm px-4">
+                <button class="btn-game btn-secondary" onclick="showLeaderboard('easy')">
+                    🏆 อันดับคะแนน
+                </button>
+            </div>
+        </div>
+
+        <!-- Pause Overlay -->
+        <div id="pause-overlay" class="overlay hidden">
+            <h2 class="text-6xl font-black mb-8 text-white drop-shadow-lg">พักยก!</h2>
+            <div class="flex flex-col gap-6 w-full max-w-xs">
+                <button class="btn-game btn-green" onclick="togglePause()">
+                    ▶ เล่นต่อ
+                </button>
+                <button class="btn-game btn-secondary" onclick="quitToMenu()">
+                    🏠 หน้าหลัก
+                </button>
+            </div>
+        </div>
+
+        <!-- Leaderboard Overlay -->
+        <div id="leaderboard-overlay" class="overlay hidden">
+            <h2 class="text-5xl font-black mb-6 text-white drop-shadow-md">🏆 หอเกียรติยศ</h2>
+            
+            <div class="leaderboard-container max-w-sm w-full mb-6 max-h-[60vh] flex flex-col">
+                <!-- Tabs -->
+                <div class="lb-tabs">
+                    <div id="tab-easy" class="lb-tab" onclick="renderLeaderboard('easy')">ง่าย</div>
+                    <div id="tab-medium" class="lb-tab" onclick="renderLeaderboard('medium')">ทั่วไป</div>
+                    <div id="tab-hard" class="lb-tab" onclick="renderLeaderboard('hard')">โปร</div>
+                </div>
+
+                <!-- Table -->
+                <div class="overflow-y-auto flex-1">
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th width="15%">#</th>
+                                <th>ชื่อ</th>
+                                <th width="25%" class="text-right">คะแนน</th>
+                                <th width="20%" class="text-right">เวลา</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-list"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <button class="btn-game btn-secondary w-full max-w-xs" onclick="showStartScreen()">กลับ</button>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div id="gameover-overlay" class="overlay hidden">
+            <div class="bg-white p-8 rounded-3xl w-full max-w-xs shadow-2xl text-gray-800 border-4 border-gray-200">
+                <h1 class="text-5xl font-black mb-2 text-red-500 text-center">จบเกม!</h1>
+                
+                <div class="text-center mb-6">
+                    <div class="text-gray-500 text-sm font-bold uppercase tracking-widest">คะแนนรวม</div>
+                    <div id="final-score" class="text-7xl font-black text-yellow-500 drop-shadow-sm">0</div>
+                </div>
+
+                <div class="flex justify-between bg-gray-100 p-4 rounded-xl mb-6 font-bold text-gray-600">
+                    <div>⏱️ <span id="final-time">00:00</span></div>
+                    <div>🎮 <span id="final-mode">ง่าย</span></div>
+                </div>
+                
+                <!-- High Score Input -->
+                <div id="highscore-section" class="hidden mb-6">
+                    <p class="text-green-500 text-lg mb-2 font-bold animate-pulse text-center">🎉 ติดอันดับสูงสุด! 🎉</p>
+                    <input type="text" id="player-name" placeholder="กรอกชื่อของคุณ" maxlength="10">
+                    <button class="btn-game btn-green text-xl py-3 shadow-none" onclick="saveScore()">บันทึก</button>
+                </div>
+
+                <!-- Buttons -->
+                <div id="gameover-buttons" class="flex flex-col gap-3">
+                    <button class="btn-game btn-yellow text-xl" onclick="startGame(currentDifficulty)">🔄 เล่นใหม่</button>
+                    <button class="btn-game btn-secondary text-xl" onclick="showStartScreen()">🏠 หน้าหลัก</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const beltContainer = document.getElementById('belt-container');
+        const animalContainer = document.getElementById('animal-container');
+        const foodLayer = document.getElementById('food-layer');
+        const scoreEl = document.getElementById('score');
+        const levelEl = document.getElementById('level');
+        const livesEl = document.getElementById('lives');
+        const timerEl = document.getElementById('timer');
+        
+        const startOverlay = document.getElementById('start-overlay');
+        const leaderboardOverlay = document.getElementById('leaderboard-overlay');
+        const gameoverOverlay = document.getElementById('gameover-overlay');
+        const pauseOverlay = document.getElementById('pause-overlay');
+        const finalScoreEl = document.getElementById('final-score');
+        const finalTimeEl = document.getElementById('final-time');
+        const finalModeEl = document.getElementById('final-mode');
+        
+        const highscoreSection = document.getElementById('highscore-section');
+        const gameoverButtons = document.getElementById('gameover-buttons');
+        const leaderboardList = document.getElementById('leaderboard-list');
+        const playerNameInput = document.getElementById('player-name');
+
+        // Settings
+        const POINTS_PER_LEVEL = 100;
+        const POINTS_PER_ANIMAL_CHANGE = 500;
+        const MAX_BELTS = 3;
+        
+        const DB_KEYS = {
+            'easy': 'zoo_score_easy_v1',
+            'medium': 'zoo_score_medium_v1',
+            'hard': 'zoo_score_hard_v1'
+        };
+
+        let score = 0;
+        let lives = 3;
+        let level = 1;
+        let beltCount = 1;
+        let currentDifficulty = 'easy';
+        
+        let gameActive = false;
+        let isPaused = false;
+        let foodItems = [];
+        let speed = 1.0;
+        let spawnRate = 2000;
+        let lastSpawnTime = 0;
+        let gameLoopReq;
+        
+        let currentAnimals = [];
+        let isSwitching = false;
+        
+        let startTime;
+        let timerInterval;
+        let pausedTime = 0;
+        let lastPauseStart = 0;
+        let elapsedTimeStr = "00:00";
+
+        const ANIMALS = [
+            { emoji: '🦁', type: 'carn', name: 'เนื้อ', icon: '🥩' },
+            { emoji: '🐯', type: 'carn', name: 'เนื้อ', icon: '🍗' },
+            { emoji: '🐊', type: 'carn', name: 'เนื้อ', icon: '🐟' },
+            { emoji: '🐘', type: 'herb', name: 'พืช', icon: '🌿' },
+            { emoji: '🦒', type: 'herb', name: 'พืช', icon: '🍃' },
+            { emoji: '🐇', type: 'herb', name: 'พืช', icon: '🥕' },
+            { emoji: '🦍', type: 'herb', name: 'พืช', icon: '🍌' }
+        ];
+
+        const FOOD_TYPES = {
+            HERB: ['🌿', '🍎', '🥕', '🥬', '🌽', '🍉', '🍌'],
+            CARN: ['🥩', '🍗', '🥓', '🐟', '🍖', '🦐'],
+            TRASH: ['👟', '💣', '🥫', '🧱', '🧤', '📦']
+        };
+
+        const BELT_POSITIONS = {
+            1: [50],
+            2: [30, 70],
+            3: [20, 50, 80]
+        };
+
+        function showStartScreen() {
+            leaderboardOverlay.classList.add('hidden');
+            gameoverOverlay.classList.add('hidden');
+            pauseOverlay.classList.add('hidden');
+            startOverlay.classList.remove('hidden');
+        }
+
+        function showLeaderboard(mode = 'easy') {
+            renderLeaderboard(mode);
+            startOverlay.classList.add('hidden');
+            gameoverOverlay.classList.add('hidden');
+            leaderboardOverlay.classList.remove('hidden');
+        }
+
+        function togglePause() {
+            if (!gameActive) return;
+            isPaused = !isPaused;
+            
+            if (isPaused) {
+                pauseOverlay.classList.remove('hidden');
+                lastPauseStart = Date.now();
+                cancelAnimationFrame(gameLoopReq);
+            } else {
+                pauseOverlay.classList.add('hidden');
+                pausedTime += Date.now() - lastPauseStart;
+                lastSpawnTime += (Date.now() - lastPauseStart); 
+                gameLoopReq = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function quitToMenu() {
+            gameActive = false;
+            isPaused = false;
+            cancelAnimationFrame(gameLoopReq);
+            clearInterval(timerInterval);
+            pauseOverlay.classList.add('hidden');
+            showStartScreen();
+        }
+
+        function renderLeaderboard(mode) {
+            const tabs = ['easy', 'medium', 'hard'];
+            tabs.forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                if(t === mode) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
+                el.onclick = () => renderLeaderboard(t);
+            });
+
+            const key = DB_KEYS[mode];
+            const scores = JSON.parse(localStorage.getItem(key)) || [];
+            
+            leaderboardList.innerHTML = scores.map((s, index) => {
+                let rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : 'text-gray-500'));
+                
+                return `
+                    <tr>
+                        <td class="${rankClass} text-center">${index + 1}</td>
+                        <td class="font-medium text-gray-800 truncate max-w-[100px]">${s.name}</td>
+                        <td class="${rankClass} text-right">${s.score}</td>
+                        <td class="text-gray-400 text-sm text-right">${s.time || '00:00'}</td>
+                    </tr>
+                `;
+            }).join('') || '<tr><td colspan="4" class="text-center text-gray-400 py-8">ยังไม่มีผู้ท้าชิง</td></tr>';
+        }
+
+        function saveScore() {
+            const name = playerNameInput.value.trim() || 'นิรนาม';
+            const newScore = {
+                name: name,
+                score: score,
+                time: elapsedTimeStr,
+                date: new Date().toISOString()
+            };
+            
+            const key = DB_KEYS[currentDifficulty];
+            let scores = JSON.parse(localStorage.getItem(key)) || [];
+            scores.push(newScore);
+            scores.sort((a, b) => b.score - a.score);
+            scores = scores.slice(0, 10); 
+            
+            localStorage.setItem(key, JSON.stringify(scores));
+            
+            showLeaderboard(currentDifficulty);
+        }
+
+        function updateTimer() {
+            if (!gameActive || isPaused) return;
+            const now = Date.now();
+            const diff = Math.floor((now - startTime - pausedTime) / 1000);
+            const minutes = Math.floor(diff / 60);
+            const seconds = diff % 60;
+            elapsedTimeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            timerEl.innerText = elapsedTimeStr;
+        }
+
+        function startGame(difficulty) {
+            score = 0;
+            lives = 3;
+            level = 1;
+            currentDifficulty = difficulty;
+            pausedTime = 0;
+            isPaused = false;
+            
+            if (difficulty === 'easy') {
+                beltCount = 1; speed = 1.0; spawnRate = 2000;
+            } else if (difficulty === 'medium') {
+                beltCount = 2; speed = 0.9; spawnRate = 1400;
+            } else if (difficulty === 'hard') {
+                beltCount = 3; speed = 0.8; spawnRate = 900;
+            }
+            
+            clearFood();
+            startTime = Date.now();
+            elapsedTimeStr = "00:00";
+            timerEl.innerText = elapsedTimeStr;
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 1000);
+
+            generateAnimals(beltCount);
+            updateScene();
+            updateUI();
+            
+            gameActive = true;
+            startOverlay.classList.add('hidden');
+            gameoverOverlay.classList.add('hidden');
+            leaderboardOverlay.classList.add('hidden');
+            pauseOverlay.classList.add('hidden');
+            
+            lastSpawnTime = performance.now();
+            if (gameLoopReq) cancelAnimationFrame(gameLoopReq);
+            gameLoopReq = requestAnimationFrame(gameLoop);
+        }
+
+        function clearFood() {
+            foodItems.forEach(item => item.el.remove());
+            foodItems = [];
+        }
+
+        function getRandomAnimal() {
+            return ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+        }
+
+        function generateAnimals(count) {
+            currentAnimals = [];
+            for (let i = 0; i < count; i++) {
+                currentAnimals.push(getRandomAnimal());
+            }
+        }
+
+        function updateScene(updateBelts = true) {
+            if (updateBelts) {
+                beltContainer.innerHTML = '';
+                const positions = BELT_POSITIONS[beltCount];
+                const beltWidth = beltCount === 3 ? '80px' : (beltCount === 2 ? '100px' : '120px');
+
+                positions.forEach(pos => {
+                    const belt = document.createElement('div');
+                    belt.className = 'belt';
+                    belt.style.left = `calc(${pos}% - ${parseInt(beltWidth)/2}px)`;
+                    belt.style.width = beltWidth;
+                    for(let i=10; i<100; i+=25) {
+                        const mark = document.createElement('div');
+                        mark.className = 'belt-marking';
+                        mark.style.top = i + '%';
+                        belt.appendChild(mark);
+                    }
+                    beltContainer.appendChild(belt);
+                });
+            }
+
+            renderAnimalsOnly();
+        }
+
+        function renderAnimalsOnly() {
+            animalContainer.innerHTML = '';
+            const positions = BELT_POSITIONS[beltCount];
+            currentAnimals.forEach((animal, index) => {
+                const pos = positions[index];
+                const slot = document.createElement('div');
+                slot.className = 'animal-slot';
+                slot.style.left = `${pos}%`;
+                slot.id = `animal-slot-${index}`;
+
+                const diet = document.createElement('div');
+                diet.className = 'animal-diet-bubble';
+                diet.innerHTML = `<span>${animal.icon}</span>`;
+                slot.appendChild(diet);
+
+                const emoji = document.createElement('div');
+                emoji.className = 'animal-emoji';
+                emoji.innerText = animal.emoji;
+                slot.appendChild(emoji);
+
+                animalContainer.appendChild(slot);
+            });
+        }
+
+        function addScore(points) {
+            const oldLevel = level;
+            const oldAnimalStage = Math.floor(score / POINTS_PER_ANIMAL_CHANGE);
+            
+            score += points;
+            
+            const newLevel = Math.floor(score / POINTS_PER_LEVEL) + 1;
+            const newAnimalStage = Math.floor(score / POINTS_PER_ANIMAL_CHANGE);
+
+            // Level Up (Speed + Spawn Rate)
+            if (newLevel > oldLevel) {
+                level = newLevel;
+                speed += 0.1;
+                spawnRate = Math.max(400, spawnRate - 80);
+                showLevelUpText();
+            }
+
+            // Animal Change
+            if (newAnimalStage > oldAnimalStage) {
+                if (beltCount === 1) {
+                    generateAnimals(beltCount);
+                    const alert = document.createElement('div');
+                    alert.className = 'switch-alert';
+                    alert.innerHTML = "เปลี่ยนสัตว์!<br><span class='text-lg font-normal'>ตัวใหม่มาแล้ว</span>";
+                    gameContainer.appendChild(alert);
+                    setTimeout(() => alert.remove(), 1500);
+                } else {
+                    // Medium/Hard: Switch ONLY ONE random animal
+                    const laneIndex = Math.floor(Math.random() * beltCount);
+                    const oldAnimal = currentAnimals[laneIndex];
+                    let newAnimal;
+                    do {
+                        newAnimal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+                    } while (newAnimal.emoji === oldAnimal.emoji);
+                    
+                    currentAnimals[laneIndex] = newAnimal;
+                    
+                    const alert = document.createElement('div');
+                    alert.className = 'switch-alert';
+                    alert.innerHTML = "ระวัง!<br><span class='text-lg font-normal'>มีสัตว์เปลี่ยน 1 ตัว</span>";
+                    gameContainer.appendChild(alert);
+                    setTimeout(() => alert.remove(), 1500);
+                }
+                renderAnimalsOnly();
+            }
+            
+            updateUI();
+        }
+
+        function showLevelUpText() {
+            const txt = document.createElement('div');
+            txt.className = 'levelup-text';
+            txt.innerText = `LEVEL UP!`;
+            gameContainer.appendChild(txt);
+            setTimeout(() => txt.remove(), 1500);
+        }
+
+        function spawnFood() {
+            const lanes = BELT_POSITIONS[beltCount];
+            const laneIndex = Math.floor(Math.random() * lanes.length);
+            const targetAnimal = currentAnimals[laneIndex];
+            
+            const rand = Math.random();
+            let type, pool;
+
+            if (rand < 0.25) { type = 'trash'; pool = FOOD_TYPES.TRASH; }
+            else if (rand < 0.6) { type = targetAnimal.type === 'herb' ? 'carn' : 'herb'; pool = targetAnimal.type === 'herb' ? FOOD_TYPES.CARN : FOOD_TYPES.HERB; }
+            else { type = targetAnimal.type; pool = targetAnimal.type === 'herb' ? FOOD_TYPES.HERB : FOOD_TYPES.CARN; }
+
+            const emoji = pool[Math.floor(Math.random() * pool.length)];
+            const el = document.createElement('div');
+            el.className = 'food-item';
+            el.innerText = emoji;
+            
+            const lanePos = lanes[laneIndex];
+            el.style.left = `${lanePos}%`;
+            el.style.top = '-100px';
+            
+            const itemObj = {
+                el: el,
+                type: type,
+                laneIndex: laneIndex,
+                y: -100,
+                sorted: false,
+                id: Date.now() + Math.random()
+            };
+
+            el.onpointerdown = (e) => {
+                e.stopPropagation();
+                handleItemClick(itemObj);
+            };
+
+            foodLayer.appendChild(el);
+            foodItems.push(itemObj);
+        }
+
+        function gameLoop(time) {
+            if (!gameActive || isPaused) return; 
+            
+            if (!isSwitching && time - lastSpawnTime > spawnRate) {
+                spawnFood();
+                lastSpawnTime = time;
+            }
+            for (let i = foodItems.length - 1; i >= 0; i--) {
+                const item = foodItems[i];
+                if (!item.sorted) {
+                    item.y += speed;
+                    item.el.style.top = item.y + 'px';
+                    if (item.y > gameContainer.offsetHeight - 200) handleReachAnimal(i);
+                }
+            }
+            gameLoopReq = requestAnimationFrame(gameLoop);
+        }
+
+        function handleReachAnimal(index) {
+            const item = foodItems[index];
+            item.sorted = true;
+            
+            const currentAnimalInLane = currentAnimals[item.laneIndex];
+            const isCorrectFood = (item.type === currentAnimalInLane.type);
+
+            item.el.style.transition = 'all 0.3s ease-in';
+            item.el.style.transform = `translate(-50%, 80px) scale(0.5)`;
+            item.el.style.opacity = '0';
+
+            const animalSlot = document.getElementById(`animal-slot-${item.laneIndex}`);
+
+            if (isCorrectFood) {
+                if (animalSlot) {
+                    animalSlot.classList.add('animal-happy');
+                    setTimeout(() => animalSlot.classList.remove('animal-happy'), 500);
+                }
+                showFeedback('+20', item.laneIndex, '#7cfc00');
+                addScore(20); 
+            } else {
+                lives--;
+                const msg = item.type === 'trash' ? 'กินขยะ!' : 'ผิด!';
+                showFeedback(`${msg} -❤️`, item.laneIndex, '#ff4500');
+                if (animalSlot) {
+                    animalSlot.classList.add('animal-angry');
+                    setTimeout(() => animalSlot.classList.remove('animal-angry'), 500);
+                }
+                updateUI();
+            }
+
+            setTimeout(() => {
+                if(item.el && item.el.parentNode) item.el.remove();
+                foodItems = foodItems.filter(f => f !== item);
+            }, 300);
+
+            if (lives <= 0) gameOver();
+        }
+
+        function handleItemClick(item) {
+            if (!gameActive || isSwitching || item.sorted || isPaused) return; 
+            item.sorted = true;
+
+            const currentAnimalInLane = currentAnimals[item.laneIndex];
+            const isCorrectFood = (item.type === currentAnimalInLane.type);
+
+            const direction = Math.random() > 0.5 ? 'right' : 'left';
+            const targetX = direction === 'left' ? -300 : 300;
+
+            item.el.style.transition = 'all 0.4s ease-out';
+            item.el.style.transform = `translate(calc(-50% + ${targetX}px), 0) rotate(${direction==='left'?'-45deg':'45deg'})`;
+            item.el.style.opacity = '0';
+
+            if (!isCorrectFood) {
+                showFeedback('+10', item.laneIndex, '#ffffff');
+                addScore(10);
+            } else {
+                lives--;
+                showFeedback('ทิ้งทำไม! -❤️', item.laneIndex, '#ffcc00');
+                updateUI();
+            }
+
+            setTimeout(() => {
+                if(item.el && item.el.parentNode) item.el.remove();
+                foodItems = foodItems.filter(f => f !== item);
+            }, 400);
+
+            if (lives <= 0) gameOver();
+        }
+
+        function showFeedback(text, laneIndex, color) {
+            const fb = document.createElement('div');
+            fb.className = 'feedback-text';
+            fb.innerText = text;
+            fb.style.color = color;
+            
+            const positions = BELT_POSITIONS[beltCount];
+            if (positions && positions[laneIndex]) fb.style.left = `${positions[laneIndex]}%`;
+            else fb.style.left = '50%';
+            
+            fb.style.top = '60%';
+            fb.style.transform = 'translateX(-50%)';
+            gameContainer.appendChild(fb);
+            setTimeout(() => fb.remove(), 1000);
+        }
+
+        function updateUI() {
+            scoreEl.innerText = score;
+            levelEl.innerText = level;
+            livesEl.innerText = '❤️'.repeat(Math.max(0, lives));
+        }
+
+        function gameOver() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            cancelAnimationFrame(gameLoopReq);
+            
+            finalScoreEl.innerText = score;
+            finalTimeEl.innerText = elapsedTimeStr;
+            
+            let modeLabel = 'ง่าย';
+            if(currentDifficulty === 'medium') modeLabel = 'ทั่วไป';
+            if(currentDifficulty === 'hard') modeLabel = 'โปร';
+            finalModeEl.innerText = modeLabel;
+            
+            gameoverOverlay.classList.remove('hidden');
+
+            const key = DB_KEYS[currentDifficulty];
+            const scores = JSON.parse(localStorage.getItem(key)) || [];
+            const minScore = scores.length < 10 ? 0 : scores[scores.length - 1].score;
+
+            if (score > minScore || scores.length < 10) {
+                highscoreSection.classList.remove('hidden');
+                gameoverButtons.classList.add('hidden');
+                playerNameInput.value = '';
+                playerNameInput.focus();
+            } else {
+                highscoreSection.classList.add('hidden');
+                gameoverButtons.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
